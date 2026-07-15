@@ -1,5 +1,5 @@
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 
 STOPWORDS = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'youre', 'youve',
             'youll', 'youd', 'your', 'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself',
@@ -17,22 +17,42 @@ STOPWORDS = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you',
             'havent', 'isn', 'isnt', 'ma', 'mightn', 'mightnt', 'mustn', 'mustnt', 'needn', 'neednt', 'shan', 'shant', 
             'shouldn', 'shouldnt', 'wasn', 'wasnt', 'weren', 'werent', 'won', 'wont', 'wouldn', 'wouldnt'}
 
-
-
+quarry = " "
 file = input("Please enter file name: ")
+
 f=open(file,'r',encoding="utf-8")
-
-print("Enter a word against which to search the text.")
-
-
-
-counter = Counter()
 
 lines = f.readlines()
 
-for line in lines : 
+counter = Counter()
+index = defaultdict(set)
+
+for num, line in enumerate(lines, start=1) : 
     words = re.sub(r"[^a-z0-9가-힣\s]", " ", line.lower().strip()).split()
     words = [word for word in words if word not in STOPWORDS]
     counter.update(words)
-    print(words)
+
+    for word in words:
+        index[word].add(num)
+
+while quarry != ".":
+    print("Enter a word against which to search the text.")
+    query = input("To quit, enter a single character = = => ")
+    
+    if query == ".":
+        print("Ok, bye!")
+        break;
+
+    tokens = re.findall(r'\w+|&&|\|\||!|\(|\)', query.lower())
+
+    if len(tokens) == 1:
+        result = index[tokens[0]]
+    
+    if len(tokens) == 3 and tokens[1] == "&&":
+        result = index[tokens[0]] & index[tokens[2]]
+    
+    if len(tokens) == 3 and tokens[1] == "||":
+        result = index[tokens[0]] | index[tokens[2]]
+    
+    print(tokens)
     
