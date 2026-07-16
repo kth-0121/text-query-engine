@@ -17,12 +17,13 @@ STOPWORDS = {'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you',
             'havent', 'isn', 'isnt', 'ma', 'mightn', 'mightnt', 'mustn', 'mustnt', 'needn', 'neednt', 'shan', 'shant', 
             'shouldn', 'shouldnt', 'wasn', 'wasnt', 'weren', 'werent', 'won', 'wont', 'wouldn', 'wouldnt'}
 
-quarry = " "
+query = " "
 file = input("Please enter file name: ")
 
 f=open(file,'r',encoding="utf-8")
 
 lines = f.readlines()
+all_lines = set(range(1, len(lines) + 1))
 
 counter = Counter()
 index = defaultdict(set)
@@ -35,7 +36,7 @@ for num, line in enumerate(lines, start=1) :
     for word in words:
         index[word].add(num)
 
-while quarry != ".":
+while query != ".":
     print("Enter a word against which to search the text.")
     query = input("To quit, enter a single character = = => ")
     
@@ -45,14 +46,51 @@ while quarry != ".":
 
     tokens = re.findall(r'\w+|&&|\|\||!|\(|\)', query.lower())
 
-    if len(tokens) == 1:
-        result = index[tokens[0]]
+    stack = []
+
+    def evaluate(t):
+        while "!" in t:
+            pos = t.index("!")
+            t[pos:pos+2] = [all_lines - t[pos+1]]
+            
+        if len(t) == 1:
+            result = t[0]
     
-    if len(tokens) == 3 and tokens[1] == "&&":
-        result = index[tokens[0]] & index[tokens[2]]
+        if len(t) == 3 and t[1] == "&&":
+            result = t[0] & t[2]
     
-    if len(tokens) == 3 and tokens[1] == "||":
-        result = index[tokens[0]] | index[tokens[2]]
-    
-    print(tokens)
+        if len(t) == 3 and t[1] == "||":
+            result = t[0] | t[2]
+        return result
+
+    for token in tokens:
+        if token not in ["&&", "||", "!", "(", ")"]:
+            stack.append(index[token])
+        else :
+            stack.append(token) 
+        
+        if stack[-1] == ")":
+            stack.pop()
+            t = []
+            while stack[-1] != "(":
+                t.append(stack.pop())
+            stack.pop()
+            t.reverse()
+            stack.append(evaluate(t))
+    result = evaluate(stack)
+
+
+
+    if len(result) == 0:
+        print(f"Sorry. There are no entries for {query}.")
+    else: 
+        if len(tokens) == 1:
+            print(f"{query} occurs {counter[query]} times:")
+        else: 
+            print(f"{query} matches {len(result)} line(s):")
+
+        for num in sorted(result):
+            print(f"( line {num} ) {lines[num - 1].strip()}")
+        
+
     
