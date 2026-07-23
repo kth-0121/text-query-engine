@@ -12,15 +12,9 @@ from storage import load_pickle
 
 INDEX_DIR = "index"
 
-MASTER_PATH = os.path.join(
-    INDEX_DIR,
-    "master.pkl"
-)
+MASTER_PATH = os.path.join(INDEX_DIR,"master.pkl")
 
-FILE_INDEX_DIR = os.path.join(
-    INDEX_DIR,
-    "files"
-)
+FILE_INDEX_DIR = os.path.join(INDEX_DIR,"files")
 
 
 master = load_pickle(MASTER_PATH)
