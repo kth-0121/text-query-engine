@@ -1,173 +1,114 @@
-"""
-search.py
+"""Interactive user interface and presentation for text-query results."""
 
-Boolean query search engine.
-"""
+from __future__ import annotations
 
-import os
-import re
+from pathlib import Path
+from typing import Any
 
+from evaluator import EvaluationResult, QueryEvaluator
+from indexer import load_document_indexes
+from parser import QueryNode, parse_query
 from storage import load_pickle
 
-
-INDEX_DIR = "index"
-
-MASTER_PATH = os.path.join(INDEX_DIR,"master.pkl")
-
-FILE_INDEX_DIR = os.path.join(INDEX_DIR,"files")
+INDEX_DIR = Path("index")
+MASTER_PATH = INDEX_DIR / "master.pkl"
+FILE_INDEX_DIR = INDEX_DIR / "files"
 
 
-master = load_pickle(MASTER_PATH)
-
-all_entries = set()
-
-for locations in master.values():
-    all_entries |= locations
-
-
-def tokenize_query(query):
-
-    return re.findall(
-        r'\w+|&&|\|\||!|\(|\)',
-        query.lower()
-    )
+def _walk_words(expression: QueryNode, words: list[str]) -> None:
+    if expression[0] == "WORD":
+        if expression[1] not in words:
+            words.append(expression[1])
+    elif expression[0] == "NOT":
+        _walk_words(expression[1], words)
+    else:
+        _walk_words(expression[1], words)
+        _walk_words(expression[2], words)
 
 
-def evaluate(tokens):
-
-    stack = []
-
-    def apply_not(expression):
-
-        while "!" in expression:
-
-            pos = expression.index("!")
-
-            expression[pos:pos + 2] = [
-                all_entries - expression[pos + 1]
-            ]
-
-        return expression
-
-    def compute(expression):
-
-        expression = apply_not(expression)
-
-        while "&&" in expression:
-
-            pos = expression.index("&&")
-
-            result = (
-                expression[pos - 1]
-                &
-                expression[pos + 1]
-            )
-
-            expression[pos - 1:pos + 2] = [result]
-
-        while "||" in expression:
-
-            pos = expression.index("||")
-
-            result = (
-                expression[pos - 1]
-                |
-                expression[pos + 1]
-            )
-
-            expression[pos - 1:pos + 2] = [result]
-
-        return expression[0]
-
-    for token in tokens:
-
-        if token == ")":
-
-            temp = []
-
-            while stack[-1] != "(":
-                temp.append(stack.pop())
-
-            stack.pop()
-
-            temp.reverse()
-
-            stack.append(
-                compute(temp)
-            )
-
-        elif token == "(":
-            stack.append(token)
-
-        elif token in ["&&", "||", "!"]:
-            stack.append(token)
-
-        else:
-            stack.append(
-                master.get(token, set())
-            )
-
-    return compute(stack)
+def _phrase_alternatives(expression: QueryNode) -> list[tuple[str, QueryNode]]:
+    """Expand OR branches to report each exact adjacent phrase occurrence."""
+    if expression[0] == "WORD":
+        return [(str(expression[1]), expression)]
+    if expression[0] == "OR":
+        return _phrase_alternatives(expression[1]) + _phrase_alternatives(expression[2])
+    if expression[0] == "AND":
+        return [
+            (f"{left_label} && {right_label}", ("AND", left, right))
+            for left_label, left in _phrase_alternatives(expression[1])
+            for right_label, right in _phrase_alternatives(expression[2])
+        ]
+    return []
 
 
-def print_results(results):
-
-    grouped = {}
-
-    for filename, line_number in results:
-
-        grouped.setdefault(
-            filename,
-            []
-        ).append(line_number)
-
-    for filename in sorted(grouped):
-
-        path = os.path.join(
-            FILE_INDEX_DIR,
-            filename.replace(".txt", ".pkl")
-        )
-
-        document = load_pickle(path)
-
-        print()
-        print(filename)
-
-        for line_number in sorted(grouped[filename]):
-
-            line = document["lines"][
-                line_number - 1
-            ].rstrip()
-
-            print(
-                f"  ({line_number}) {line}"
-            )
+def _walk_phrase_nodes(expression: QueryNode, nodes: list[QueryNode]) -> None:
+    if expression[0] == "NOT":
+        _walk_phrase_nodes(expression[1], nodes)
+    elif expression[0] in {"AND", "OR"}:
+        _walk_phrase_nodes(expression[1], nodes)
+        _walk_phrase_nodes(expression[2], nodes)
+        if expression[0] == "AND":
+            nodes.append(expression)
 
 
-def main():
+def print_statistics(expression: QueryNode, evaluator: QueryEvaluator) -> None:
+    """Show individual-word and exact-adjacent-phrase occurrence counts."""
+    words: list[str] = []
+    _walk_words(expression, words)
+    for word in words:
+        count = len(evaluator.master_index.get(word, set()))
+        print(f"{word}: {count} {'occurrence' if count == 1 else 'occurrences'}")
+
+    phrases: list[QueryNode] = []
+    _walk_phrase_nodes(expression, phrases)
+    shown: set[str] = set()
+    for phrase in phrases:
+        for label, alternative in _phrase_alternatives(phrase):
+            if label not in shown:
+                shown.add(label)
+                count = evaluator.evaluate(alternative).occurrence_count
+                print(f"{label}: {count} {'occurrence' if count == 1 else 'occurrences'}")
+
+
+def print_results(result: EvaluationResult, documents: dict[str, dict[str, Any]]) -> None:
+    """Print each matching original line once, ordered by file then line number."""
+    for filename, line_number in sorted(result.lines, key=lambda item: (item[0].casefold(), item[1])):
+        document = documents[filename]
+        lines = document["lines"]
+        if 1 <= line_number <= len(lines):
+            print(f"({line_number}) {filename}: {lines[line_number - 1]}")
+
+
+def main() -> None:
+    """Start the interactive Boolean query loop."""
+    master = load_pickle(MASTER_PATH, {})
+    documents = load_document_indexes(FILE_INDEX_DIR)
+    if not isinstance(master, dict) or not documents:
+        print("No usable index found. Please run main.py to build the index first.")
+        return
+    evaluator = QueryEvaluator(master, documents)
 
     while True:
-
-        query = input("\nSearch (. to quit): ").strip()
-
+        print("\nEnter a Boolean query.")
+        query = input("To quit, enter '.' => ").strip()
         if query == ".":
-            break
-
-        tokens = tokenize_query(query)
-
-        results = evaluate(tokens)
-
-        if not results:
-
-            print("No results found.")
+            print("Ok, bye!")
+            return
+        if not query:
+            print("Please enter a query.")
+            continue
+        try:
+            expression = parse_query(query)
+            result = evaluator.evaluate(expression)
+        except ValueError as error:
+            print(f"Invalid query: {error}")
             continue
 
-        print(
-            f"\nFound {len(results)} matching line(s)."
-        )
-
-        print_results(results)
-
-
-if __name__ == "__main__":
-    main()
+        print()
+        print_statistics(expression, evaluator)
+        if not result.lines:
+            print(f"No results found for: {query}")
+            continue
+        print(f"\nFound {len(result.lines)} matching line(s).")
+        if input("Display matching lines? (Y/n) => ").strip().casefold() not in {"n", "no"}:
+            print_results(result, documents)

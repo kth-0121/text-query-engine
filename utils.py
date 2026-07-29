@@ -1,51 +1,44 @@
-"""utils.py"""
-# 프로젝트에서 공통으로 사용하는 유틸리티 함수들
+"""Shared text-normalization and naming helpers."""
 
-import os
+from __future__ import annotations
+
+import hashlib
 import re
 
 from stopwords import STOPWORDS
 
-def normalize_text(text):
-    """소문자로 변환하고 한글, 영어, 숫자를 제외한 문자를 제거한다."""
-    text = text.lower()
-    text = re.sub(r"[^a-z0-9가-힣\s]", " ",text)
+_PUNCTUATION = re.compile(r"[^0-9a-zA-Z가-힣\s]+")
 
-    return text
 
-def tokenize(text):
-    """문자열을 단어 리스트로 변환한다."""
+def normalize_text(text: str) -> str:
+    """Case-fold English and replace punctuation with whitespace.
 
+    Korean syllables, English letters, numbers, and existing whitespace are
+    retained.  ``casefold`` leaves Korean unchanged.
+    """
+    return _PUNCTUATION.sub(" ", text.casefold())
+
+
+def tokenize(text: str) -> list[str]:
+    """Split normalized text into whitespace-delimited tokens."""
     return text.split()
 
 
-def remove_stopwords(words):
-    """불용어를 제거한다."""
+def preprocess_with_positions(text: str) -> list[tuple[str, int]]:
+    """Return indexed tokens with original (pre-stopword-removal) positions.
 
-    return [word for word in words if word not in STOPWORDS]
-
-
-def preprocess(text):
-    """하나의 문자열을 전처리하여 단어 리스트를 반환한다."""
-
-    text = normalize_text(text)
-
-    words = tokenize(text)
-
-    words = remove_stopwords(words)
-
-    return words
+    Keeping original positions prevents ``abe was lincoln`` from matching the
+    adjacent query ``abe && lincoln`` after the stopword ``was`` is removed.
+    """
+    return [
+        (word, position)
+        for position, word in enumerate(tokenize(normalize_text(text)))
+        if word not in STOPWORDS
+    ]
 
 
-def get_file_mtime(path):
-    """파일의 마지막 수정 시간을 반환한다."""
-
-    return os.path.getmtime(path)
-
-
-def safe_filename(filename):
-    """txt 파일명을 pkl 파일명으로 변환한다."""
-
-    name = os.path.splitext(filename)[0]
-
-    return name + ".pkl"
+def safe_filename(document_name: str) -> str:
+    """Return a collision-safe pickle filename for a relative document path."""
+    stem = document_name.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    digest = hashlib.sha256(document_name.encode("utf-8")).hexdigest()[:16]
+    return f"{stem}-{digest}.pkl"

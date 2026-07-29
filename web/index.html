@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A private, browser-only Boolean text query engine."
+    />
+    <title>Text Query Engine</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">LOCAL · PRIVATE · STATIC</p>
+        <h1>Text Query Engine</h1>
+        <p>Search text files with Boolean queries, entirely in your browser.</p>
+        <p class="hero-korean">TXT 파일을 하나 이상 선택한 후 Boolean Query를 입력하면 브라우저에서 파일 내용을 검색할 수 있습니다.</p>
+      </header>
+
+      <section class="card" aria-labelledby="files-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-label">01</p>
+            <h2 id="files-title">Upload text files</h2>
+          </div>
+          <span id="file-status" class="status" aria-live="polite">No files selected.</span>
+        </div>
+        <label class="file-picker" for="file-input">
+          <span>Choose TXT files</span>
+          <input id="file-input" type="file" accept=".txt,text/plain" multiple />
+        </label>
+        <p class="privacy-note">Files stay in this browser tab and are never uploaded.</p>
+        <ul id="file-list" class="file-list" aria-live="polite"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="query-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-label">02</p>
+            <h2 id="query-title">Boolean query</h2>
+          </div>
+        </div>
+        <form id="search-form" novalidate>
+          <p class="query-help">Search using words and Boolean operators. <a href="#query-guide">View the full Boolean Query Guide below.</a></p>
+          <div class="operator-hints" aria-label="Boolean query operator summary">
+            <span><code>&amp;&amp;</code> AND · adjacent words</span>
+            <span><code>||</code> OR · either expression</span>
+            <span><code>!</code> NOT · exclude expression</span>
+            <span><code>()</code> GROUP · combine conditions</span>
+          </div>
+          <label class="sr-only" for="query-input">Boolean query</label>
+          <div class="query-row">
+            <input id="query-input" type="text" placeholder="(A || B) && C" autocomplete="off" />
+            <button type="submit">Search</button>
+          </div>
+        </form>
+        <div class="examples" aria-label="Query examples">
+          <span>Try:</span>
+          <button type="button" data-query="A">A</button>
+          <button type="button" data-query="! A">! A</button>
+          <button type="button" data-query="A && B">A && B</button>
+          <button type="button" data-query="A || B">A || B</button>
+          <button type="button" data-query="(A || B) && C">(A || B) && C</button>
+        </div>
+      </section>
+
+      <section id="query-guide" class="card guide-card" aria-labelledby="guide-title">
+        <details open>
+          <summary>
+            <span>
+              <span class="section-label">GUIDE</span>
+              <span id="guide-title" class="guide-title">Boolean Query Guide <small>질의 사용법</small></span>
+            </span>
+            <span class="summary-action">Show / hide</span>
+          </summary>
+          <p class="guide-intro">A, B, C, and D are placeholders for words or expressions you want to search. For example, <code>(cat || dog) &amp;&amp; animal</code> uses real search terms. <strong><code>&amp;&amp;</code> always means adjacent words on the same line, not merely two words in one line.</strong></p>
+          <div class="guide-grid">
+            <article class="guide-item">
+              <h3><code>&amp;&amp;</code> AND</h3>
+              <p>두 표현이 같은 줄에서 인접해서 나타나는 경우를 찾습니다.</p>
+              <button type="button" class="query-example" data-query="A && B">A &amp;&amp; B</button>
+              <p class="guide-detail"><code>A B</code>는 일치하지만 <code>A X B</code>는 일치하지 않습니다. A 바로 다음에 B가 있어야 합니다.</p>
+            </article>
+            <article class="guide-item">
+              <h3><code>||</code> OR</h3>
+              <p>두 표현 중 하나 이상이 나타나는 줄을 찾습니다. 둘 다 있어도 한 번만 표시합니다.</p>
+              <button type="button" class="query-example" data-query="A || B">A || B</button>
+              <p class="guide-detail">A가 있거나 B가 있거나, A와 B가 모두 있는 경우를 찾습니다.</p>
+            </article>
+            <article class="guide-item">
+              <h3><code>!</code> NOT</h3>
+              <p>특정 표현이 포함되지 않은 모든 줄을 찾습니다.</p>
+              <button type="button" class="query-example" data-query="! A">! A</button>
+              <p class="guide-detail">A가 포함되지 않은 줄이 검색됩니다.</p>
+            </article>
+            <article class="guide-item">
+              <h3><code>()</code> GROUP</h3>
+              <p>여러 조건을 하나의 그룹으로 묶어 원하는 순서로 평가합니다.</p>
+              <button type="button" class="query-example" data-query="(A || B) && C">(A || B) &amp;&amp; C</button>
+              <p class="guide-detail">A 또는 B가 C와 인접한 <code>A C</code> 또는 <code>B C</code> 형태를 찾습니다.</p>
+            </article>
+          </div>
+          <div class="complex-queries">
+            <h3>Complex query examples <small>복합 질의 예시</small></h3>
+            <p>These examples show query structure; replace A, B, C, and D with your own search terms.</p>
+            <div class="complex-query-list">
+              <code>(A || B) &amp;&amp; C</code>
+              <code>(A &amp;&amp; B) || C</code>
+              <code>!(A || B)</code>
+              <code>(A || B) &amp;&amp; (C || D)</code>
+              <code>((A || B) &amp;&amp; C) || D</code>
+            </div>
+          </div>
+          <div class="guide-footer">
+            <strong>Try an example:</strong>
+            <button type="button" data-query="A">A</button>
+            <button type="button" data-query="! A">! A</button>
+            <button type="button" data-query="A && B">A && B</button>
+            <button type="button" data-query="A || B">A || B</button>
+            <button type="button" data-query="(A || B) && C">(A || B) && C</button>
+            <button type="button" data-query="(A && B) || C">(A && B) || C</button>
+            <button type="button" data-query="!(A || B)">!(A || B)</button>
+            <button type="button" data-query="(A || B) && (C || D)">(A || B) && (C || D)</button>
+          </div>
+        </details>
+      </section>
+
+      <section class="card results-card" aria-labelledby="results-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-label">03</p>
+            <h2 id="results-title">Search results</h2>
+          </div>
+        </div>
+        <div id="message" class="message neutral" role="status">No search performed yet.</div>
+        <div id="summary" class="summary" hidden></div>
+        <div id="results" class="results" aria-live="polite"></div>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
